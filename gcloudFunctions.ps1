@@ -87,3 +87,25 @@ function gcSwitchContext {
 
     kubectl.exe config current-context | ForEach-Object { kubectl.exe config set-context $_ --namespace=$nameSpace }
 }
+
+function gcClearJobs {
+	param([string]$JobRegex)
+
+    if ([string]::IsNullOrEmpty($JobRegex)) {
+        return
+    }
+	
+	kubectl.exe get jobs | Where-Object {$_ -match $JobRegex } | % {Write-Output "kubectl.exe delete job $($_.split(' ')[0])"} | % { (Parallel -Command $_ -Limit 30) }
+}
+
+function gcToObject {
+	param([string]$gcCommand)
+
+    if ([string]::IsNullOrEmpty($gcCommand)) {
+        return
+    }
+	
+	$sb = [scriptblock]::create("$gcCommand")
+	$csvOutput = Invoke-Command $sb | ForEach-Object -Begin {$tempOutput=""} {$line = $_ -replace '\s+',','; $tempOutput += "$line`n"} -end {Write-Output $tempOutput} | ConvertFrom-Csv
+	Write-Output $csvOutput
+}
