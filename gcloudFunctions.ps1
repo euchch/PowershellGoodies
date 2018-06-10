@@ -89,13 +89,23 @@ function gcSwitchContext {
 }
 
 function gcClearJobs {
-	param([string]$JobRegex)
+	param([Parameter(Mandatory)][string]$JobRegex,
+		[switch]$FutureJobsOnly
+	)
+	
+	$gcObjectifiedJobs = $null
 
     if ([string]::IsNullOrEmpty($JobRegex)) {
         return
     }
 	
-	kubectl get jobs | Where-Object {$_ -match $JobRegex } | % {Write-Output "kubectl delete job $($_.split(' ')[0])"} | % { (Parallel -Command $_ -Limit 30) }
+	if ($FutureJobsOnly) {
+		$gcObjectifiedJobs =  gcToObject "kubectl get jobs" | Where-Object {$_.DESIRED -gt $_.SUCCESSFUL}
+	} else {
+		$gcObjectifiedJobs =  gcToObject "kubectl get jobs"
+	}
+	
+	$gcObjectifiedJobs | Where-Object {$_.NAME -match $JobRegex } | % {Write-Output "kubectl delete job $($_.NAME)"} | % { (Parallel -Command $_ -Limit 30) }
 }
 
 function gcToObject {
@@ -239,7 +249,8 @@ function gcGetActiveSparkApplications {
 }
 
 function gcInstanceBash {
-	param([Parameter(Mandatory)][string]$PodName)
+	param([Parameter(Mandatory)][string]$PodName,
+		[string]$RunCommand)
 
     if ([string]::IsNullOrEmpty($PodName)) {
         return
@@ -250,11 +261,15 @@ function gcInstanceBash {
     }
 
     switch ($dvEnvironment) {
-        "dev" {$dvEnv = $dvDevProject}
-        "staging" {$dvEnv = $dvStagingProject}
-        "prod" {$dvEnv = $dvProdProject}
+        "d" {$dvEnv = $dvDevProject}
+        "s" {$dvEnv = $dvStagingProject}
+        "p" {$dvEnv = $dvProdProject}
         default {return}
     }
 	
-	gcloud compute --project $dvEnv ssh --zone $dvDefaultZone "$PodName"
+    if ([string]::IsNullOrEmpty($RunCommand)) {
+		gcloud compute --project $dvEnv ssh --zone $dvDefaultZone "$PodName"
+    } else {
+		gcloud compute --project $dvEnv ssh --zone $dvDefaultZone "$PodName" --command $RunCommand
+	}
 }
