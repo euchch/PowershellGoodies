@@ -249,10 +249,10 @@ function gcGetActiveSparkApplications {
 }
 
 function gcInstanceBash {
-	param([Parameter(Mandatory)][string]$PodName,
+	param([Parameter(Mandatory)][string]$InstanceName,
 		[string]$RunCommand)
 
-    if ([string]::IsNullOrEmpty($PodName)) {
+    if ([string]::IsNullOrEmpty($InstanceName)) {
         return
     }
 	
